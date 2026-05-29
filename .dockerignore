@@ -1,0 +1,31 @@
+# 排除非运行时文件，缩小镜像
+.git/
+.gitignore
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.codegraph/
+
+# 文档与前端
+docs/
+frontend/
+*.md
+
+# 本地配置
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Compose volume 数据
+neo4j_data/
+redis_data/
+postgres_data/
