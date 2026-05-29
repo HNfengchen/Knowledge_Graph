@@ -32,6 +32,7 @@ env/
 .venv
 
 # IDE
+.codegraph/
 .vscode/
 .idea/
 *.swp
@@ -64,3 +65,12 @@ htmlcov/
 *.tmp
 *.temp
 *.bak
+
+# Linting & type checking
+.mypy_cache/
+.ruff_cache/
+
+# Docker volumes (本地)
+neo4j_data/
+redis_data/
+postgres_data/
