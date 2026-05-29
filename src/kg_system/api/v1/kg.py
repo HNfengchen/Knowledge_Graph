@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
+
+from kg_system.api.deps import get_kg_query, get_neo4j, get_redis, require_user
+from kg_system.builder.pipeline import KGBuildPipeline
+from kg_system.core.config import get_settings
+from kg_system.core.models import ApiResponse, SubgraphResult
+from kg_system.kg_query.service import KGQueryService
+from kg_system.llm.callbacks import AnalysisCallbackHandler
+from kg_system.llm.factory import get_chat_model
+from kg_system.storage.neo4j_client import Neo4jClient
+from kg_system.storage.redis_client import RedisClient
+
+router = APIRouter(prefix="/kg", tags=["kg"])
+
+
+class BuildRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+    doc_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BuildResponseData(BaseModel):
+    doc_id: str
+    chunks: int
+    entities_upserted: int
+    relations_upserted: int
+
+
+class QueryRequest(BaseModel):
+    entity_name: str
+    depth: int = Field(2, ge=1, le=3)
+    relation_types: list[str] | None = None
+
+
+@router.post("/build", response_model=ApiResponse[BuildResponseData])
+async def build_endpoint(
+    body: BuildRequest,
+    neo4j: Neo4jClient = Depends(get_neo4j),
+    redis: RedisClient = Depends(get_redis),
+    user=Depends(require_user),
+):
+    s = get_settings()
+    if len(body.text) > s.TEXT_MAX_LENGTH:
+        from kg_system.core.exceptions import InvalidInput
+
+        raise InvalidInput(f"text exceeds TEXT_MAX_LENGTH={s.TEXT_MAX_LENGTH}")
+
+    callback = AnalysisCallbackHandler(redis)
+    llm = get_chat_model().with_config({"callbacks": [callback]})
+    pipeline = KGBuildPipeline(llm=llm, neo4j=neo4j)
+    doc_id = body.doc_id or KGBuildPipeline.gen_doc_id()
+    result = await pipeline.run(body.text, doc_id)
+    return ApiResponse(
+        data=BuildResponseData(
+            doc_id=result.doc_id,
+            chunks=result.chunks,
+            entities_upserted=result.entities_upserted,
+            relations_upserted=result.relations_upserted,
+        )
+    )
+
+
+@router.post("/query", response_model=ApiResponse[SubgraphResult])
+async def query_endpoint(
+    body: QueryRequest,
+    kg: KGQueryService = Depends(get_kg_query),
+    user=Depends(require_user),
+):
+    sg = await kg.query_subgraph(body.entity_name, body.depth, body.relation_types)
+    return ApiResponse(data=sg)
