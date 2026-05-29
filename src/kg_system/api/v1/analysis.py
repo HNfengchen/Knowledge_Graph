@@ -23,4 +23,4 @@ async def analyze_endpoint(
     window_seconds: int = Query(300, ge=60, le=86400),
     _admin=Depends(require_admin),
 ):
-    raise NotImplementedInSkeleton("/llm/analyze")
+    raise NotImplementedInSkeleton()

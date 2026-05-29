@@ -23,4 +23,4 @@ class AskResponse(BaseModel):
 
 @router.post("/ask", response_model=ApiResponse[AskResponse])
 async def ask_endpoint(body: AskRequest, user=Depends(require_user)):
-    raise NotImplementedInSkeleton("/reason/ask")
+    raise NotImplementedInSkeleton()

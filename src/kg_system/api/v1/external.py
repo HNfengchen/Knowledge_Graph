@@ -32,19 +32,19 @@ class EmbedReq(BaseModel):
 
 @router.post("/subgraph", response_model=ApiResponse[SubgraphResult])
 async def subgraph_endpoint(body: SubgraphReq, _ext=Depends(require_external)):
-    raise NotImplementedInSkeleton("/kg/external/subgraph")
+    raise NotImplementedInSkeleton()
 
 
 @router.post("/context", response_model=ApiResponse[dict])
 async def context_endpoint(body: ContextReq, _ext=Depends(require_external)):
-    raise NotImplementedInSkeleton("/kg/external/context")
+    raise NotImplementedInSkeleton()
 
 
 @router.post("/cypher", response_model=ApiResponse[list[dict]])
 async def cypher_endpoint(body: CypherReq, _ext=Depends(require_external)):
-    raise NotImplementedInSkeleton("/kg/external/cypher")
+    raise NotImplementedInSkeleton()
 
 
 @router.post("/embed", response_model=ApiResponse[list[list[float]]])
 async def embed_endpoint(body: EmbedReq, _ext=Depends(require_external)):
-    raise NotImplementedInSkeleton("/kg/external/embed")
+    raise NotImplementedInSkeleton()
