@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     ADMIN_TOKEN: str = ""
     EXTERNAL_API_KEY: str = ""
     EXTERNAL_API_IP_WHITELIST: str = "127.0.0.1,::1"
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = ""
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
