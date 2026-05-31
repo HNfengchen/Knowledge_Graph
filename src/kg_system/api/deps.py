@@ -6,7 +6,9 @@ from kg_system.core.config import get_settings
 from kg_system.core.exceptions import AuthError
 from kg_system.kg_query.service import KGQueryService
 from kg_system.storage.neo4j_client import Neo4jClient
+from kg_system.storage.postgres_client import PostgresClient
 from kg_system.storage.redis_client import RedisClient
+from kg_system.storage.user_repo import UserRepo
 
 
 # —— 资源依赖 —— #
@@ -22,15 +24,13 @@ def get_kg_query(neo4j: Neo4jClient = Depends(get_neo4j)) -> KGQueryService:
     return KGQueryService(neo4j)
 
 
-from kg_system.storage.postgres_client import PostgresClient
-from kg_system.storage.user_repo import UserRepo
+def get_postgres(request: Request) -> PostgresClient | None:
+    return getattr(request.app.state, "postgres", None)
 
 
-def get_postgres(request: Request) -> PostgresClient:
-    return request.app.state.postgres
-
-
-def get_user_repo(pg: PostgresClient = Depends(get_postgres)) -> UserRepo:
+def get_user_repo(pg: PostgresClient | None = Depends(get_postgres)) -> UserRepo:
+    if pg is None:
+        raise AuthError("user database unavailable")
     return UserRepo(pg)
 
 

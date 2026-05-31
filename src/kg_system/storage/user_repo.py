@@ -25,7 +25,9 @@ class UserRepo:
             role,
         )
         user = await self.get_user(username)
-        assert user is not None
+        if user is None:
+            from kg_system.core.exceptions import KGException
+            raise KGException(f"user '{username}' was not created after insert")
         return user
 
     async def update_password_hash(self, username: str, password_hash: str) -> None:
