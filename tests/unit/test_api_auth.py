@@ -131,3 +131,73 @@ class TestAuthRegister:
         )
         assert resp.status_code == 401
         assert "6" in resp.json()["msg"]
+
+
+@pytest.mark.unit
+class TestAuthLoginRateLimit:
+    async def test_login_rate_limit_exceeded(self, auth_client, fake_redis):
+        fake_redis.get_client().get.return_value = b"5"
+        resp = await auth_client.post(
+            "/api/v1/auth/login",
+            json={"username": "alice", "password": "secret"},
+        )
+        assert resp.status_code == 429
+
+
+@pytest.mark.unit
+class TestAuthRefresh:
+    async def test_refresh_success(self, auth_client):
+        from kg_system.auth.jwt import create_refresh_token
+        token = create_refresh_token("alice")
+        resp = await auth_client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": token},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["code"] == 200
+        assert "access_token" in data["data"]
+
+    async def test_refresh_invalid_token_type(self, auth_client):
+        from kg_system.auth.jwt import create_access_token
+        token = create_access_token("alice")
+        resp = await auth_client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": token},
+        )
+        assert resp.status_code == 401
+
+    async def test_refresh_revoked_token(self, auth_client, fake_redis):
+        from kg_system.auth.jwt import create_refresh_token
+        token = create_refresh_token("alice")
+        fake_redis.get_client().get.return_value = b"1"
+        resp = await auth_client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": token},
+        )
+        assert resp.status_code == 401
+
+
+@pytest.mark.unit
+class TestAuthLogout:
+    async def test_logout_with_jti(self, auth_client, fake_redis):
+        from kg_system.auth.jwt import create_access_token
+        token = create_access_token("alice")
+        resp = await auth_client.post(
+            "/api/v1/auth/logout",
+            json={"jti": "test-jti-123"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["code"] == 200
+        fake_redis.get_client().setex.assert_called()
+
+    async def test_logout_without_jti(self, auth_client):
+        from kg_system.auth.jwt import create_access_token
+        token = create_access_token("alice")
+        resp = await auth_client.post(
+            "/api/v1/auth/logout",
+            json={"jti": ""},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
