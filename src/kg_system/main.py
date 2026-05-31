@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from kg_system.analysis.collector import StreamCollector
@@ -83,6 +83,52 @@ def create_app() -> FastAPI:
     @app.get("/health", response_model=ApiResponse[dict])
     async def health() -> ApiResponse[dict]:
         return ApiResponse(data={"status": "ok"})
+
+    @app.get("/health/ready", response_model=ApiResponse[dict])
+    async def health_ready(request: Request) -> ApiResponse[dict]:
+        state = request.app.state
+        statuses: dict[str, str] = {}
+
+        neo4j: Neo4jClient | None = getattr(state, "neo4j", None)
+        if neo4j:
+            try:
+                await neo4j.execute_cypher("RETURN 1 AS ok")
+                statuses["neo4j"] = "ok"
+            except Exception:
+                statuses["neo4j"] = "unavailable"
+        else:
+            statuses["neo4j"] = "not_configured"
+
+        redis: RedisClient | None = getattr(state, "redis", None)
+        if redis:
+            try:
+                r = redis.get_client()
+                await r.ping()
+                await r.close()
+                statuses["redis"] = "ok"
+            except Exception:
+                statuses["redis"] = "unavailable"
+        else:
+            statuses["redis"] = "not_configured"
+
+        postgres: PostgresClient | None = getattr(state, "postgres", None)
+        if postgres:
+            try:
+                await postgres.fetchrow("SELECT 1 AS ok")
+                statuses["postgres"] = "ok"
+            except Exception:
+                statuses["postgres"] = "unavailable"
+        else:
+            statuses["postgres"] = "not_configured"
+
+        all_ok = all(v == "ok" for v in statuses.values())
+        if not all_ok:
+            from starlette.responses import JSONResponse
+            return JSONResponse(
+                status_code=503,
+                content=ApiResponse(code=503, msg="not ready", data=statuses).model_dump(),
+            )
+        return ApiResponse(data=statuses)
 
     app.include_router(kg_router, prefix="/api/v1")
     app.include_router(reason_router, prefix="/api/v1")

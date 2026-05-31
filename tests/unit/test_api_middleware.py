@@ -31,3 +31,19 @@ async def test_request_id_in_response(client: AsyncClient):
 async def test_request_id_passthrough(client: AsyncClient):
     resp = await client.get("/health", headers={"X-Request-ID": "my-rid-123"})
     assert resp.headers["X-Request-ID"] == "my-rid-123"
+
+
+@pytest.mark.unit
+async def test_health_ready_all_down(client: AsyncClient):
+    resp = await client.get("/health/ready")
+    assert resp.status_code == 503
+    data = resp.json()
+    assert data["code"] == 503
+    assert "neo4j" in data["data"]
+
+
+@pytest.mark.unit
+async def test_health_liveness_returns_200(client: AsyncClient):
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "ok"
