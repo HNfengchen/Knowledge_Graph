@@ -73,6 +73,12 @@ serviceAccount:
   annotations: {}
   name: ""
 
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
 service:
   type: ClusterIP
   port: 8000
