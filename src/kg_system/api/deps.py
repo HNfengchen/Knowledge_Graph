@@ -23,21 +23,55 @@ def get_kg_query(neo4j: Neo4jClient = Depends(get_neo4j)) -> KGQueryService:
 
 
 # —— 认证依赖 —— #
-def require_user(authorization: str | None = Header(default=None)) -> dict:
-    """业务端点：Bearer JWT。骨架阶段只校验 token 非空 + 签名。"""
+def _decode_and_check(token: str) -> dict:
+    from kg_system.auth.jwt import decode_token
+
+    payload = decode_token(token)
+    return payload
+
+
+def require_user(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """业务端点：Bearer JWT。校验签名 + 黑名单。"""
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthError("missing bearer token")
-    token = authorization.split(None, 1)[1].strip()
-    if not token:
+    parts = authorization.split(None, 1)
+    if len(parts) < 2 or not parts[1].strip():
         raise AuthError("empty bearer token")
-    s = get_settings()
-    try:
-        from jose import jwt
+    payload = _decode_and_check(parts[1].strip())
 
-        payload = jwt.decode(token, s.JWT_SECRET_KEY, algorithms=[s.JWT_ALGORITHM])
-    except Exception as e:
-        raise AuthError(f"invalid token: {e}") from e
+    # 检查 access token 是否在黑名单（redis 不可用则跳过）
+    jti = payload.get("jti", "")
+    if jti:
+        try:
+            redis = request.app.state.redis
+            if redis:
+                from kg_system.core.config import get_settings
+
+                r = redis.get_client()
+                try:
+                    revoked = r.get(f"{get_settings().REDIS_KEY_PREFIX}auth:revoked:{jti}")
+                    if revoked:
+                        raise AuthError("token revoked")
+                finally:
+                    r.close()
+        except (AttributeError, Exception):
+            pass
+
+    request.state.user = payload
     return payload
+
+
+def require_role(role: str):
+    """角色守卫装饰器。"""
+
+    def _checker(user: dict = Depends(require_user)) -> None:
+        if user.get("role") != role:
+            raise AuthError(f"requires {role} role")
+
+    return _checker
 
 
 def require_admin(authorization: str | None = Header(default=None)) -> None:
@@ -47,7 +81,10 @@ def require_admin(authorization: str | None = Header(default=None)) -> None:
         raise AuthError("admin token not configured")
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthError("missing admin bearer token")
-    token = authorization.split(None, 1)[1].strip()
+    parts = authorization.split(None, 1)
+    if len(parts) < 2 or not parts[1].strip():
+        raise AuthError("missing admin bearer token")
+    token = parts[1].strip()
     if token != s.ADMIN_TOKEN:
         raise AuthError("invalid admin token")
 

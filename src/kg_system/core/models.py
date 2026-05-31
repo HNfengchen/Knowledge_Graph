@@ -57,3 +57,7 @@ class Alert(BaseModel):
     severity: str
     message: str
     metrics: dict[str, Any] = Field(default_factory=dict)
+
+
+# 确保泛型类型中的 forward ref 被正确解析
+ApiResponse.model_rebuild()

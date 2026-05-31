@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from kg_system.analysis.collector import StreamCollector
 from kg_system.api.middleware import install_middleware_and_handlers
 from kg_system.api.v1.analysis import router as analysis_router
+from kg_system.api.v1.auth import router as auth_router
 from kg_system.api.v1.external import router as external_router
 from kg_system.api.v1.kg import router as kg_router
 from kg_system.api.v1.reason import router as reason_router
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(reason_router, prefix="/api/v1")
     app.include_router(analysis_router, prefix="/api/v1")
     app.include_router(external_router, prefix="/api/v1")
+    app.include_router(auth_router, prefix="/api/v1")
 
     return app
 

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # 应用基础
     APP_NAME: str = "knowledge-graph-system"
-    APP_ENV: Literal["development", "staging", "production"] = "development"
+    APP_ENV: Literal["development", "staging", "production", "test"] = "development"
     APP_DEBUG: bool = True
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000

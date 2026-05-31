@@ -133,6 +133,76 @@ class Neo4jClient:
         log.info("relations_upserted", count=count)
         return count
 
+    async def vector_search_entities(
+        self, embedding: list[float], top_k: int = 10, threshold: float = 0.85
+    ) -> list[GraphNode]:
+        """使用 entity_embedding 向量索引召回候选节点。"""
+        try:
+            rows = await self.execute_cypher(
+                """
+                CALL db.index.vector.queryNodes('entity_embedding', $top_k, $embedding)
+                YIELD node, score
+                WHERE score >= $threshold
+                RETURN node, score
+                ORDER BY score DESC
+                """,
+                {"embedding": embedding, "top_k": top_k, "threshold": threshold},
+            )
+        except Exception as e:
+            log.warning("vector_search_failed", error=str(e))
+            return []
+        results = []
+        for row in rows:
+            n = row["node"]
+            results.append(
+                GraphNode(
+                    id=n.get("id"),
+                    name=n.get("name"),
+                    type=n.get("type"),
+                    props={
+                        k: v
+                        for k, v in n.items()
+                        if k not in {"id", "name", "type", "embedding"}
+                    },
+                )
+            )
+        return results
+
+    async def fulltext_search_entities(
+        self, name: str, top_k: int = 10
+    ) -> list[GraphNode]:
+        """使用 entity_name_fulltext 全文索引模糊匹配。"""
+        try:
+            rows = await self.execute_cypher(
+                """
+                CALL db.index.fulltext.queryNodes('entity_name_fulltext', $query)
+                YIELD node, score
+                RETURN node, score
+                ORDER BY score DESC
+                LIMIT $top_k
+                """,
+                {"query": name, "top_k": top_k},
+            )
+        except Exception as e:
+            log.warning("fulltext_search_failed", error=str(e))
+            return []
+        results = []
+        for row in rows:
+            n = row["node"]
+            results.append(
+                GraphNode(
+                    id=n.get("id"),
+                    name=n.get("name"),
+                    type=n.get("type"),
+                    props={
+                        k: v
+                        for k, v in n.items()
+                        if k not in {"id", "name", "type", "embedding"}
+                    },
+                )
+            )
+        return results
+
     async def match_subgraph(
         self,
         entity_name: str,
