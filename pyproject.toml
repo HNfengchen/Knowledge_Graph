@@ -25,6 +25,10 @@ dependencies = [
     "structlog>=24.4",
     "python-jose[cryptography]>=3.3",
     "asyncpg>=0.30,<1.0",
+    # ===== 文件处理 =====
+    "pymupdf>=1.24",
+    "pytesseract>=0.3",
+    "python-multipart>=0.0",
 ]
 
 [project.optional-dependencies]

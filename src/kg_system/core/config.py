@@ -141,6 +141,11 @@ class Settings(BaseSettings):
     MONTHLY_BUDGET_USD: float = 2000.00
     BUDGET_ALERT_THRESHOLD: float = 0.80
 
+    # ── 文件处理 ──
+    MAX_FILE_SIZE: int = 20 * 1024 * 1024  # 20 MB
+    SUPPORTED_FILE_EXTENSIONS: set[str] = {".pdf"}
+    OCR_LANGUAGE: str = "chi_sim+eng"
+
     # 缓存
     SEMANTIC_CACHE_ENABLED: bool = True
     SEMANTIC_CACHE_SIMILARITY_THRESHOLD: float = 0.95
