@@ -2,28 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import time
-import uuid
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from kg_system.api.deps import get_redis, require_user
+from kg_system.api.deps import get_redis, get_user_repo, require_user
 from kg_system.auth.jwt import create_access_token, create_refresh_token, decode_token
 from kg_system.core.config import get_settings
 from kg_system.core.exceptions import AuthError, RateLimitError
 from kg_system.core.logging import get_logger
 from kg_system.core.models import ApiResponse
 from kg_system.storage.redis_client import RedisClient
+from kg_system.storage.user_repo import UserRepo
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-_users: dict[str, dict] = {
-    "admin": {
-        "password": hashlib.sha256("admin123".encode()).hexdigest(),
-        "role": "admin",
-    },
-}
 
 
 class LoginReq(BaseModel):
@@ -56,16 +49,17 @@ async def login(
     body: LoginReq,
     request: Request,
     redis: RedisClient = Depends(get_redis),
+    users: UserRepo = Depends(get_user_repo),
 ):
     ip = request.client.host if request.client else "unknown"
     await _check_login_rate_limit(redis, ip)
 
-    user = _users.get(body.username)
+    user = await users.get_user(body.username)
     if not user:
         raise AuthError("invalid username or password")
 
     pw_hash = hashlib.sha256(body.password.encode()).hexdigest()
-    if user["password"] != pw_hash:
+    if user["password_hash"] != pw_hash:
         r = redis.get_client()
         try:
             minute = int(time.time()) // 60
@@ -93,6 +87,7 @@ async def login(
 async def refresh_token(
     body: TokenReq,
     redis: RedisClient = Depends(get_redis),
+    users: UserRepo = Depends(get_user_repo),
 ):
     payload = decode_token(body.refresh_token)
 
@@ -110,7 +105,8 @@ async def refresh_token(
         await r.close()
 
     sub = payload.get("sub", "")
-    role = _users.get(sub, {}).get("role", "user")
+    user = await users.get_user(sub)
+    role = user["role"] if user else "user"
     access = create_access_token(sub, role=role)
     new_refresh = create_refresh_token(sub)
 
@@ -140,14 +136,17 @@ async def logout(
 
 
 @router.post("/register", response_model=ApiResponse[dict])
-async def register(body: LoginReq):
-    if body.username in _users:
-        raise AuthError("username already exists")
+async def register(
+    body: LoginReq,
+    users: UserRepo = Depends(get_user_repo),
+):
     if len(body.password) < 6:
         raise AuthError("password too short, minimum 6 characters")
 
-    _users[body.username] = {
-        "password": hashlib.sha256(body.password.encode()).hexdigest(),
-        "role": "user",
-    }
+    exists = await users.user_exists(body.username)
+    if exists:
+        raise AuthError("username already exists")
+
+    pw_hash = hashlib.sha256(body.password.encode()).hexdigest()
+    await users.create_user(body.username, pw_hash, role="user")
     return ApiResponse(data={"message": "user created"})
