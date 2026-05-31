@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 
+from collections.abc import AsyncGenerator
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from kg_system.api.deps import get_kg_query, get_neo4j, get_redis, require_user
@@ -13,6 +16,8 @@ from kg_system.kg_query.service import KGQueryService
 from kg_system.llm.callbacks import AnalysisCallbackHandler
 from kg_system.llm.factory import get_chat_model
 from kg_system.reasoning.graph import build_reasoning_graph
+from kg_system.reasoning.state import ReasonerState
+from kg_system.reasoning.streaming import build_event_stream
 from kg_system.storage.neo4j_client import Neo4jClient
 from kg_system.storage.redis_client import RedisClient
 
@@ -102,4 +107,39 @@ async def ask_endpoint(
             reasoning_trace=final_state.get("reasoning_trace", []),
             evidence=evidence,
         )
+    )
+
+
+@router.post("/ask-stream")
+async def ask_stream(
+    body: AskRequest,
+    neo4j: Neo4jClient = Depends(get_neo4j),
+    redis: RedisClient = Depends(get_redis),
+    user=Depends(require_user),
+):
+    s = get_settings()
+    if len(body.question) > (s.TEXT_MAX_LENGTH // 2):
+        from kg_system.core.exceptions import InvalidInput
+        raise InvalidInput(f"question too long, max {s.TEXT_MAX_LENGTH // 2}")
+
+    graph = _get_or_build_graph(neo4j, redis)
+
+    initial_state: ReasonerState = {
+        "question": body.question,
+        "max_steps": body.max_steps,
+        "step_count": 0,
+        "reasoning_trace": [],
+        "subgraph": None,
+        "next_action": "retrieve",
+        "answer": "",
+    }
+
+    return StreamingResponse(
+        build_event_stream(graph, initial_state),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
     )
