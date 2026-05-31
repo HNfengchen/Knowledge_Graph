@@ -16,6 +16,7 @@ from kg_system.core.config import get_settings
 from kg_system.core.logging import configure_logging, get_logger
 from kg_system.core.models import ApiResponse
 from kg_system.storage.neo4j_client import Neo4jClient
+from kg_system.storage.postgres_client import PostgresClient
 from kg_system.storage.redis_client import RedisClient
 from kg_system.storage.schemas import apply_schema
 
@@ -33,6 +34,21 @@ async def lifespan(app: FastAPI):
     app.state.collector = StreamCollector(app.state.redis)
     await app.state.collector.start()
 
+    try:
+        app.state.postgres = await PostgresClient.create()
+        if s.ADMIN_USERNAME and s.ADMIN_PASSWORD:
+            import hashlib
+            from kg_system.storage.user_repo import UserRepo
+            repo = UserRepo(app.state.postgres)
+            admin = await repo.get_user(s.ADMIN_USERNAME)
+            if not admin:
+                pw_hash = hashlib.sha256(s.ADMIN_PASSWORD.encode()).hexdigest()
+                await repo.create_user(s.ADMIN_USERNAME, pw_hash, role="admin")
+                log.info("admin_seeded", username=s.ADMIN_USERNAME)
+    except Exception:
+        log.warning("postgres_unavailable", exc_info=True)
+        app.state.postgres = None
+
     log.info("startup_done")
     try:
         yield
@@ -41,6 +57,8 @@ async def lifespan(app: FastAPI):
         await app.state.collector.stop()
         await app.state.redis.close()
         await app.state.neo4j.close()
+        if hasattr(app.state, "postgres") and app.state.postgres:
+            await app.state.postgres.close()
         log.info("shutdown_done")
 
 

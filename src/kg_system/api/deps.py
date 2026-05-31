@@ -22,6 +22,18 @@ def get_kg_query(neo4j: Neo4jClient = Depends(get_neo4j)) -> KGQueryService:
     return KGQueryService(neo4j)
 
 
+from kg_system.storage.postgres_client import PostgresClient
+from kg_system.storage.user_repo import UserRepo
+
+
+def get_postgres(request: Request) -> PostgresClient:
+    return request.app.state.postgres
+
+
+def get_user_repo(pg: PostgresClient = Depends(get_postgres)) -> UserRepo:
+    return UserRepo(pg)
+
+
 # —— 认证依赖 —— #
 def _decode_and_check(token: str) -> dict:
     from kg_system.auth.jwt import decode_token
