@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 
-from collections.abc import AsyncGenerator
-
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -134,8 +132,23 @@ async def ask_stream(
         "answer": "",
     }
 
+    from kg_system.reasoning.streaming import sse_event
+
+    async def _stream_with_timeout():
+        import asyncio
+        iterator = build_event_stream(graph, initial_state)
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(iterator.__anext__(), timeout=s.OPENAI_TIMEOUT)
+                    yield event
+                except StopAsyncIteration:
+                    break
+        except asyncio.TimeoutError:
+            yield sse_event("error", message="reasoning timed out")
+
     return StreamingResponse(
-        build_event_stream(graph, initial_state),
+        _stream_with_timeout(),
         media_type="text/event-stream",
         headers={
             "X-Accel-Buffering": "no",

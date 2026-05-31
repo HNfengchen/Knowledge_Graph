@@ -109,6 +109,18 @@ async def test_ask_stream_returns_sse(stream_app):
     assert "token" in types
     assert "complete" in types
 
+    # Verify token content accumulates
+    token_contents = [e["content"] for e in events if e["type"] == "token"]
+    assert "".join(token_contents) == "hello world"
+
+    # Verify complete event payload
+    complete_events = [e for e in events if e["type"] == "complete"]
+    assert len(complete_events) == 1
+    assert complete_events[0]["answer"] == "final answer"
+    assert "thought" in complete_events[0]["trace"]
+    assert "generated" in complete_events[0]["trace"]
+    assert "evidence" in complete_events[0]
+
 
 @pytest.mark.unit
 async def test_ask_stream_question_too_long(stream_app):
