@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -100,7 +101,6 @@ async def test_ask_stream_returns_sse(stream_app):
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/event-stream")
 
-    import json
     lines = resp.text.strip().split("\n\n")
     events = [json.loads(l.replace("data: ", "")) for l in lines if l.startswith("data:")]
     types = [e["type"] for e in events]
@@ -120,6 +120,28 @@ async def test_ask_stream_returns_sse(stream_app):
     assert "thought" in complete_events[0]["trace"]
     assert "generated" in complete_events[0]["trace"]
     assert "evidence" in complete_events[0]
+
+
+@pytest.mark.unit
+async def test_ask_stream_error_event_on_exception(stream_app):
+    with patch("kg_system.api.v1.reason._get_or_build_graph") as mock_builder:
+        mock_graph = MagicMock()
+        mock_graph.astream_events.side_effect = RuntimeError("LLM connection failed")
+        mock_builder.return_value = mock_graph
+
+        transport = ASGITransport(app=stream_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/v1/reason/ask-stream",
+                json={"question": "test", "max_steps": 3},
+                headers={"Authorization": _bearer_token()},
+            )
+
+    assert resp.status_code == 200
+    lines = resp.text.strip().split("\n\n")
+    events = [json.loads(l.replace("data: ", "")) for l in lines if l.startswith("data:")]
+    assert events[-1]["type"] == "error"
+    assert "LLM connection failed" in events[-1]["message"]
 
 
 @pytest.mark.unit

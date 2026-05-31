@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from fastapi import APIRouter, Depends
@@ -8,14 +9,14 @@ from pydantic import BaseModel, Field
 
 from kg_system.api.deps import get_kg_query, get_neo4j, get_redis, require_user
 from kg_system.core.config import get_settings
-from kg_system.core.exceptions import InvalidInput, LLMError
+from kg_system.core.exceptions import InvalidInput, LLMError, LLMTimeoutError
 from kg_system.core.models import ApiResponse, SubgraphResult
 from kg_system.kg_query.service import KGQueryService
 from kg_system.llm.callbacks import AnalysisCallbackHandler
 from kg_system.llm.factory import get_chat_model
 from kg_system.reasoning.graph import build_reasoning_graph
 from kg_system.reasoning.state import ReasonerState
-from kg_system.reasoning.streaming import build_event_stream
+from kg_system.reasoning.streaming import build_event_stream, sse_event
 from kg_system.storage.neo4j_client import Neo4jClient
 from kg_system.storage.redis_client import RedisClient
 
@@ -69,16 +70,12 @@ async def ask_endpoint(
         "answer": "",
     }
 
-    import asyncio
-
     try:
         final_state = await asyncio.wait_for(
             graph.ainvoke(initial_state),
             timeout=s.OPENAI_TIMEOUT,
         )
     except asyncio.TimeoutError:
-        from kg_system.core.exceptions import LLMTimeoutError
-
         raise LLMTimeoutError("reasoning timed out")
     except Exception as e:
         raise LLMError(f"reasoning failed: {e}") from e
@@ -117,7 +114,6 @@ async def ask_stream(
 ):
     s = get_settings()
     if len(body.question) > (s.TEXT_MAX_LENGTH // 2):
-        from kg_system.core.exceptions import InvalidInput
         raise InvalidInput(f"question too long, max {s.TEXT_MAX_LENGTH // 2}")
 
     graph = _get_or_build_graph(neo4j, redis)
@@ -132,18 +128,11 @@ async def ask_stream(
         "answer": "",
     }
 
-    from kg_system.reasoning.streaming import sse_event
-
     async def _stream_with_timeout():
-        import asyncio
-        iterator = build_event_stream(graph, initial_state)
         try:
-            while True:
-                try:
-                    event = await asyncio.wait_for(iterator.__anext__(), timeout=s.OPENAI_TIMEOUT)
+            async with asyncio.timeout(s.OPENAI_TIMEOUT):
+                async for event in build_event_stream(graph, initial_state):
                     yield event
-                except StopAsyncIteration:
-                    break
         except asyncio.TimeoutError:
             yield sse_event("error", message="reasoning timed out")
 
