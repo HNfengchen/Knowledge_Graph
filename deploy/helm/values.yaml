@@ -1,0 +1,119 @@
+# -- Number of replicas
+replicaCount: 1
+
+image:
+  repository: kg-api
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+config:
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8000"
+  LOG_LEVEL: INFO
+  LOG_FORMAT: json
+  TEXT_CHUNK_SIZE: "1000"
+  TEXT_CHUNK_OVERLAP: "200"
+  TEXT_MAX_LENGTH: "10000"
+  ENTITY_TYPES: "Person,Organization,Location,Event,Concept"
+  ENTITY_SIMILARITY_THRESHOLD: "0.85"
+  RELATION_TYPES: "RELATED_TO,HAS_PROPERTY,PART_OF,WORKS_FOR,LOCATED_IN"
+  RELATION_SIMILARITY_THRESHOLD: "0.80"
+  EMBEDDING_MODEL: text-embedding-3-small
+  EMBEDDING_DIMENSIONS: "1536"
+  EMBEDDING_BATCH_SIZE: "100"
+  REASONING_MAX_STEPS: "5"
+  REASONING_SUBGRAPH_DEPTH: "3"
+  REASONING_SUBGRAPH_MAX_NODES: "100"
+  REASONING_TEMPERATURE: "0.3"
+  ALERT_ENABLED: "true"
+  ALERT_CHECK_INTERVAL: "60"
+  SEMANTIC_CACHE_ENABLED: "true"
+  SEMANTIC_CACHE_SIMILARITY_THRESHOLD: "0.95"
+  SEMANTIC_CACHE_MAX_SIZE: "10000"
+  SEMANTIC_CACHE_TTL: "86400"
+  CORS_ORIGINS: "http://localhost:3000"
+  CORS_ALLOW_CREDENTIALS: "true"
+  ADMIN_USERNAME: admin
+
+neo4j:
+  uri: bolt://neo4j:7687
+  user: neo4j
+  database: neo4j
+  maxConnectionPoolSize: "50"
+  connectionTimeout: "30"
+
+redis:
+  host: redis
+  port: "6379"
+  db: "0"
+  ssl: "false"
+  keyPrefix: "kg:"
+  cacheTtl: "3600"
+
+postgres:
+  host: postgres
+  port: "5432"
+  user: kg_user
+  database: knowledge_graph
+  poolSize: "10"
+
+jwt:
+  algorithm: HS256
+  accessTokenExpireMinutes: "1440"
+
+serviceAccount:
+  create: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: kg-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

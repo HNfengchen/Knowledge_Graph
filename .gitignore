@@ -70,6 +70,9 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Worktrees
+.worktrees/
+
 # Docker volumes (本地)
 neo4j_data/
 redis_data/

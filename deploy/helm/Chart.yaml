@@ -1,0 +1,10 @@
+apiVersion: v2
+name: knowledge-graph
+description: Knowledge Graph System API
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - knowledge-graph
+  - neo4j
+  - llm

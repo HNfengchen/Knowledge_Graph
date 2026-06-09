@@ -10,3 +10,5 @@ class ReasonerState(TypedDict, total=False):
     answer: str
     next_action: str  # retrieve | reason | generate | end
     step_count: int
+    max_steps: int
+    query_for_retrieve: str

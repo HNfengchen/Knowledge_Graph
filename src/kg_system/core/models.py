@@ -57,3 +57,27 @@ class Alert(BaseModel):
     severity: str
     message: str
     metrics: dict[str, Any] = Field(default_factory=dict)
+
+
+# —— PDF 文件提取 ——
+class PageOcrResult(BaseModel):
+    page_num: int
+    text: str
+
+
+class PdfResult(BaseModel):
+    text: str
+    page_count: int
+    pages: list[PageOcrResult]
+
+
+class IngestResponse(BaseModel):
+    doc_id: str
+    page_count: int
+    chunks: int
+    entities_upserted: int
+    relations_upserted: int
+
+
+# 确保泛型类型中的 forward ref 被正确解析
+ApiResponse.model_rebuild()

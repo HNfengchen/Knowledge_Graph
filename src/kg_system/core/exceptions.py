@@ -27,6 +27,11 @@ class LLMError(KGException):
 
 class LLMTimeoutError(LLMError):
     code = 504
+
+
+class RequestTimeout(KGException):
+    code = 504
+    msg = "request timed out"
     msg = "LLM call timeout"
 
 

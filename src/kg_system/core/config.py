@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # 应用基础
     APP_NAME: str = "knowledge-graph-system"
-    APP_ENV: Literal["development", "staging", "production"] = "development"
+    APP_ENV: Literal["development", "staging", "production", "test"] = "development"
     APP_DEBUG: bool = True
     APP_HOST: str = "0.0.0.0"
     APP_PORT: int = 8000
@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     ADMIN_TOKEN: str = ""
     EXTERNAL_API_KEY: str = ""
     EXTERNAL_API_IP_WHITELIST: str = "127.0.0.1,::1"
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = ""
 
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
@@ -138,6 +140,11 @@ class Settings(BaseSettings):
     DAILY_BUDGET_USD: float = 100.00
     MONTHLY_BUDGET_USD: float = 2000.00
     BUDGET_ALERT_THRESHOLD: float = 0.80
+
+    # ── 文件处理 ──
+    MAX_FILE_SIZE: int = 20 * 1024 * 1024  # 20 MB
+    SUPPORTED_FILE_EXTENSIONS: set[str] = {".pdf"}
+    OCR_LANGUAGE: str = "chi_sim+eng"
 
     # 缓存
     SEMANTIC_CACHE_ENABLED: bool = True

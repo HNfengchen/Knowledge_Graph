@@ -55,3 +55,30 @@ def get_chat_model(provider: Provider | None = None) -> BaseChatModel:
         )
 
     raise ConfigError(f"unknown LLM provider: {p}")
+
+
+def get_embedding_model():
+    """返回 embedding 模型（OpenAI / Ollama 兼容）。
+
+    返回对象需有 `embed_documents(texts: list[str]) -> list[list[float]]` 方法。
+    """
+    s = get_settings()
+    provider = s.LLM_DEFAULT_PROVIDER
+    if provider == "openai":
+        from langchain_openai import OpenAIEmbeddings
+
+        if not s.OPENAI_API_KEY:
+            raise ConfigError("OPENAI_API_KEY is empty for embedding")
+        return OpenAIEmbeddings(
+            api_key=s.OPENAI_API_KEY,
+            base_url=s.OPENAI_BASE_URL,
+            model=s.EMBEDDING_MODEL,
+        )
+    # local 也走 OpenAI 兼容协议（vLLM / Ollama）
+    from langchain_openai import OpenAIEmbeddings
+
+    return OpenAIEmbeddings(
+        api_key=s.LOCAL_LLM_API_KEY,
+        base_url=s.LOCAL_LLM_BASE_URL,
+        model=s.EMBEDDING_MODEL,
+    )
