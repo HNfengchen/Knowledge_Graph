@@ -6,6 +6,50 @@
 
 骨架阶段：核心链路（文本→LLM抽取→Neo4j 入库→子图查询）端到端可跑；推理、调用分析、告警、外部接口为占位。
 
+#### 1.2 模块交互关系图
+
+```mermaid
+graph TD
+    Client[前端 Vue3+D3] -->|HTTP REST| APIGateway[API Gateway FastAPI]
+  
+    subgraph 核心服务层
+        APIGateway --> BuildMod[KG构建模块]
+        APIGateway --> ReasonMod[推理分析模块]
+        APIGateway --> AnalysisMod[调用分析模块]
+    end
+
+    subgraph LLM服务层
+        LLMInte[LLM集成模块] -->|统一接口| BuildMod
+        LLMInte -->|统一接口| ReasonMod
+        LLMInte --> LLMProvider[服务商API/本地URL]
+        LLMInte --> RedisCache[(Redis 缓存)]
+        LLMInte -.->|回调埋点| AnalysisMod
+        AnalysisMod -.->|读取追踪数据| LLMInte
+        AnalysisMod -->|写入调用记录| RedisStream[(Redis Stream)]
+        AnalysisMod -->|查询指标| RedisMetrics[(Redis Metrics)]
+    end
+
+    subgraph 存储层
+        BuildMod -->|Cypher写入| Neo4j[(Neo4j 图库)]
+        ReasonMod -->|Cypher查询| Neo4j
+        AnalysisMod -->|查询图谱| Neo4j
+    end
+
+    subgraph 监控告警层
+        AnalysisMod --> AlertMgr[告警管理器]
+        AlertMgr -.->|通知| Webhook[Webhook服务]
+        AlertMgr -.->|通知| Email[邮件服务]
+        AlertMgr -.->|告警日志| AlertLog[(告警日志)]
+    end
+
+    subgraph 外部接口层
+        AnalysisMod -->|KG查询接口| ExternalLLM[外部LLM系统]
+        ExternalLLM -.->|API调用| AnalysisMod
+    end
+
+    Client -->|WebSocket/REST| Neo4j
+```
+
 ## 快速开始（Docker Compose）
 
 ```bash
